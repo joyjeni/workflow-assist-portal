@@ -1,0 +1,33 @@
+[
+  {
+    "referenceCode": "WAP-2025-0001",
+    "category": "Housing Subsidy",
+    "status": "DRAFT",
+    "applicant": "Meera Iyer"
+  },
+  {
+    "referenceCode": "WAP-2025-0002",
+    "category": "Education Grant",
+    "status": "UNDER_REVIEW",
+    "applicant": "Meera Iyer",
+    "aiRecommendation": "MANUAL_REVIEW",
+    "riskLevel": "MEDIUM"
+  },
+  {
+    "referenceCode": "WAP-2025-0003",
+    "category": "Pension Enrollment",
+    "status": "APPROVED",
+    "applicant": "Rohan Kumar",
+    "aiRecommendation": "APPROVE",
+    "riskLevel": "LOW"
+  },
+  {
+    "referenceCode": "WAP-2025-0004",
+    "category": "Business Permit",
+    "status": "REJECTED",
+    "applicant": "Rohan Kumar",
+    "aiRecommendation": "REQUEST_CORRECTION",
+    "riskLevel": "HIGH",
+    "adminOverride": true
+  }
+]

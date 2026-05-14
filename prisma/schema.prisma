@@ -1,0 +1,217 @@
+// Workflow Assist Portal — Prisma schema (PostgreSQL)
+// This schema is the source of truth for the domain model.
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  CITIZEN
+  ADMIN
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  AI_REVIEW
+  UNDER_REVIEW
+  CORRECTION_REQUESTED
+  ESCALATED
+  APPROVED
+  REJECTED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AIRecommendation {
+  APPROVE
+  MANUAL_REVIEW
+  REQUEST_CORRECTION
+}
+
+enum AIStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum DecisionType {
+  APPROVE
+  REJECT
+  REQUEST_CORRECTION
+  ESCALATE
+  OVERRIDE
+}
+
+enum AuditAction {
+  APPLICATION_CREATED
+  DRAFT_UPDATED
+  APPLICATION_SUBMITTED
+  DOCUMENT_UPLOADED
+  AI_CHECK_TRIGGERED
+  AI_CHECK_COMPLETED
+  ADMIN_REVIEWED
+  STATUS_CHANGED
+  AI_OVERRIDE_USED
+  NOTIFICATION_SENT
+}
+
+// ---------- Models ----------
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  fullName      String
+  role          Role           @default(CITIZEN)
+  phone         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  applications  Application[]   @relation("ApplicantApplications")
+  reviews       AdminReview[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([role])
+}
+
+model Application {
+  id            String              @id @default(cuid())
+  referenceCode String              @unique
+  applicantId   String
+  applicant     User                @relation("ApplicantApplications", fields: [applicantId], references: [id], onDelete: Cascade)
+  category      String
+  title         String
+  status        ApplicationStatus   @default(DRAFT)
+  submittedAt   DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  details       ApplicationDetails?
+  documents     Document[]
+  aiAssessments AIAssessment[]
+  reviews       AdminReview[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([applicantId])
+  @@index([createdAt])
+}
+
+model ApplicationDetails {
+  id               String      @id @default(cuid())
+  applicationId    String      @unique
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Citizen-provided structured fields
+  fullName         String
+  dateOfBirth      DateTime
+  nationalId       String
+  addressLine1     String
+  addressLine2     String?
+  city             String
+  state            String
+  postalCode       String
+  reason           String      @db.Text
+  declaredIncome   Int?
+  householdSize    Int?
+  prevApplications Int?        @default(0)
+  extra            Json?
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Document {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  storageKey    String      // local-demo or s3 key
+  category      String      // "id_proof", "address_proof", "supporting", etc.
+  uploadedAt    DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+model AIAssessment {
+  id                 String           @id @default(cuid())
+  applicationId      String
+  application        Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  modelVersion       String
+  status             AIStatus         @default(PENDING)
+  riskLevel          RiskLevel?
+  riskScore          Float?
+  confidenceScore    Float?
+  recommendation     AIRecommendation?
+  explanationSummary Json?            // string[]
+  rawSignals         Json?
+  createdAt          DateTime         @default(now())
+  completedAt        DateTime?
+
+  @@index([applicationId])
+}
+
+model AdminReview {
+  id              String       @id @default(cuid())
+  applicationId   String
+  application     Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewerId      String
+  reviewer        User         @relation(fields: [reviewerId], references: [id])
+  decision        DecisionType
+  notes           String?      @db.Text
+  overrodeAI      Boolean      @default(false)
+  overrideReason  String?      @db.Text
+  createdAt       DateTime     @default(now())
+
+  @@index([applicationId])
+  @@index([reviewerId])
+}
+
+model AuditLog {
+  id            String      @id @default(cuid())
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  actorId       String?
+  actor         User?        @relation(fields: [actorId], references: [id])
+  actorRole     Role?
+  action        AuditAction
+  oldStatus     ApplicationStatus?
+  newStatus     ApplicationStatus?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Notification {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  title         String
+  body          String      @db.Text
+  read          Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+
+  @@index([userId, read])
+}
